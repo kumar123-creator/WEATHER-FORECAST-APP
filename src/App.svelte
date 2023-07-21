@@ -4,29 +4,67 @@
 	let errorMessage = '';
 	let isLoading = false;
 	let temperatureUnit = 'C';
-  
-	async function fetchWeatherData() {
-	  isLoading = true;
-	  try {
-		const response = await fetch(
-		  `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=38326992ca5cb4961d8fd698ae59edfc`
-		);
-		if (!response.ok) {
-		  throw new Error('Failed to fetch weather data');
-		}
-		const rawData = await response.json();
-		weatherData = processWeatherData(rawData);
-		errorMessage = '';
-		weatherData.list.forEach((forecast) => {
-		  forecast.temperature = getTemperature(forecast.temperature);
-		});
-	  } catch (error) {
-		errorMessage = 'Failed to fetch weather data. Please try again later.';
-		weatherData = null;
-	  } finally {
-		isLoading = false;
-	  }
-	}
+	let savedCities = [];
+
+	async function displayWeatherForCity(selectedCity) {
+  city = selectedCity;
+
+  // Add a class to the selected city for styling
+  const cityElements = document.querySelectorAll('.city-saving-section li');
+  cityElements.forEach((element) => {
+    if (element.innerText === selectedCity) {
+      element.classList.add('selected');
+    } else {
+      element.classList.remove('selected');
+    }
+  });
+
+  await fetchWeatherData();
+}
+
+
+async function fetchWeatherData() {
+    isLoading = true;
+    try {
+      const response = await fetch(
+        `https://api.openweathermap.org/data/2.5/forecast?q=${city}&appid=38326992ca5cb4961d8fd698ae59edfc`
+      );
+      if (!response.ok) {
+        throw new Error('Failed to fetch weather data');
+      }
+      const rawData = await response.json();
+      weatherData = processWeatherData(rawData);
+      errorMessage = '';
+      weatherData.list.forEach((forecast) => {
+        forecast.temperature = getTemperature(forecast.temperature);
+      });
+
+      const cityIndex = savedCities.findIndex((cityData) => cityData.name === weatherData.city.name);
+      if (cityIndex !== -1) {
+        savedCities.splice(cityIndex, 1); // Remove existing data for the selected city
+      }
+
+      const cityData = {
+        name: weatherData.city.name,
+        temperature: weatherData.list[0].temperature,
+      };
+      savedCities.push(cityData);
+
+      // Limit the number of saved cities to 5
+      if (savedCities.length > 5) {
+        savedCities.shift(); // Remove the oldest city to maintain 5 saved cities
+      }
+
+      // Clear the input placeholder after successful fetch
+      city = '';
+    } catch (error) {
+      errorMessage = 'Failed to fetch weather data. Please try again later.';
+      weatherData = null;
+    } finally {
+      isLoading = false;
+    }
+  }
+
   
 	function processWeatherData(rawData) {
 	  const dailyForecast = [];
@@ -44,6 +82,11 @@
 			windSpeed: forecast.wind.speed,
 			icon: `https://openweathermap.org/img/wn/${forecast.weather[0].icon}.png`,
 		  });
+
+		  // Check if 5 days have been added and stop adding more data
+		  if (dailyForecast.length === 5) {
+          break;
+        }
 		}
 	  }
   
@@ -60,57 +103,85 @@
 		return temperature;
 	  }
 	}
+  
+	function removeCity(savedCityName) {
+    savedCities = savedCities.filter((cityData) => cityData.name !== savedCityName);
+  }
+
   </script>
   
   <main>
-	<h1>5-DAY WEATHER FORECAST</h1>
+<!-- Saved Cities Column -->
+<div class="saved-cities-section">
+	<h2>Saved Cities</h2>
+	<ul class="city-saving-section">
+	  {#each savedCities as cityData}
+	  <li on:click={() => displayWeatherForCity(cityData.name)} class:selected={cityData.name === (weatherData ? weatherData.city.name : '')}>
+		<span class="city-name"> 
+		  {cityData.name} - {getTemperature(cityData.temperature)}{temperatureUnit === 'C' ? '°C' : '°F'}
+		</span>
+		<button class="remove-button" on:click={() => removeCity(cityData.name)}>Remove</button>
+	  </li>
+	  {/each}
+	</ul>
+  </div>
   
-	<div class="input-container">
-	  <input type="text" bind:value={city} placeholder="Enter city name" />
-	  <button on:click={fetchWeatherData} disabled={isLoading}>
-		{#if isLoading}
+
+
+	<div class="weather-forecast-section">
+	  <h1>5-DAY WEATHER FORECAST</h1>
+  
+	  <div class="input-container">
+		<input type="text" bind:value={city} placeholder="Enter city name" />
+		<button on:click={fetchWeatherData} disabled={isLoading}>
+		  {#if isLoading}
 		  <span class="loader"></span> Loading...
-		{:else}
+		  {:else}
 		  Get Weather
-		{/if}
-	  </button>
-	</div>
+		  {/if}
+		</button>
+	  </div>
   
-	<select bind:value={temperatureUnit}>
-	  <option value="C">Celsius</option>
-	  <option value="F">Fahrenheit</option>
-	</select>
+	  <select bind:value={temperatureUnit}>
+		<option value="C">Celsius</option>
+		<option value="F">Fahrenheit</option>
+	  </select>
   
-	{#if weatherData}
+
+	  {#if weatherData}
 	  <div class="city-name">
-		<h2>{weatherData.city.name}</h2>
+		<h2>{weatherData.city.name} ({getTemperature(weatherData.list[0].temperature)}{temperatureUnit === 'C' ? '°C' : '°F'})</h2>
 	  </div>
 	  <div class="weather-container">
 		{#each weatherData.list as forecast}
-		  <div class="forecast-item">
-			<p>Date: {forecast.date}</p>
-			<img src={forecast.icon} alt={forecast.weather} />
-			<p>Temperature: {getTemperature(forecast.temperature)}{temperatureUnit === 'C' ? '°C' : '°F'}</p>
-			<p>Weather: {forecast.weather}</p>
-			<p>Humidity: {forecast.humidity}%</p>
-			<p>Wind Speed: {forecast.windSpeed} m/s</p>
-		  </div>
+		<div class="forecast-item">
+		  <p>Date: {forecast.date}</p>
+		  <img src={forecast.icon} alt={forecast.weather} />
+		  <p>Temperature: {getTemperature(forecast.temperature)}{temperatureUnit === 'C' ? '°C' : '°F'}</p>
+		  <p>Weather: {forecast.weather}</p>
+		  <p>Humidity: {forecast.humidity}%</p>
+		  <p>Wind Speed: {forecast.windSpeed} m/s</p>
+		</div>
 		{/each}
 	  </div>
-	{/if}
+	  {/if}
   
-	{#if errorMessage}
+	  {#if errorMessage}
 	  <p class="error-message">{errorMessage}</p>
-	{/if}
+	  {/if}
+	</div>
   </main>
   
   <style>
 	main {
-	  text-align: center;
-	  padding: 20px;
-	  font-family: Arial, sans-serif;
-	  background-color: #f5f5f5;
-	}
+    text-align: center;
+    padding: 20px;
+    font-family: Arial, sans-serif;
+    background-image: url('https://static.vecteezy.com/system/resources/previews/006/893/924/large_2x/clear-blue-sky-with-plain-white-cloud-with-space-for-text-background-the-vast-blue-sky-and-clouds-blue-sky-background-with-tiny-clouds-nature-free-photo.jpg'); /* Replace 'path_to_your_blue_sky_image.jpg' with the actual path to your image */
+    background-size: cover;
+    background-repeat: no-repeat;
+    background-position: center;
+  }
   
 	h1 {
 	  font-size: 28px;
@@ -198,4 +269,78 @@
 	  color: #ff0000;
 	  margin-top: 10px;
 	}
+
+	
+	main {
+    display: flex; 
+    align-items: flex-start; 
+    justify-content: center; 
+    min-height: 100vh; 
+  }
+
+  .weather-forecast-section {
+    flex: 2;
+    text-align: center;
+    padding: 20px;
+    background-color: rgba(255, 255, 255, 0.8); 
+    border-radius: 8px; 
+	margin-left: 10px;
+
+  }
+
+  .saved-cities-section {
+    flex: 1;
+    text-align: left;
+    padding: 20px;
+    background-color: rgba(255, 255, 255, 0.8);
+    border-radius: 8px;
+	margin-right: 10px;
+  }
+
+  .city-saving-section {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+  }
+
+  .city-saving-section li {
+    cursor: pointer;
+    padding: 5px;
+  }
+
+  .city-saving-section li.selected {
+    background-color: purple;
+    color: white;
+  }
+
+  .selected {
+  background-color: purple;
+  color: white;
+}
+
+.city-saving-section li {
+  cursor: pointer;
+  padding: 5px;
+  transition: background-color 0.3s; /* Add a transition for smooth color change */
+}
+
+.city-saving-section li:hover {
+  background-color: wheat; /* Change background color on hover */
+}
+
+city-name {
+    display: inline-block;
+    margin-right: 10px;
+  }
+
+  .remove-button {
+    padding: 5px 8px;
+    font-size: 12px;
+    background-color: #f44336;
+    color: white;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+  }
+
   </style>
