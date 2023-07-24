@@ -5,23 +5,61 @@
 	let isLoading = false;
 	let temperatureUnit = 'C';
 	let savedCities = [];
+	
+	$: {
+    console.log('Temperature Unit Changed:', temperatureUnit);
+    updateTemperatureDisplay();
+  }
 
-	async function displayWeatherForCity(selectedCity) {
-  city = selectedCity;
+  function displayWeatherForCity(selectedCity) {
+    city = selectedCity;
 
-  // Add a class to the selected city for styling
-  const cityElements = document.querySelectorAll('.city-saving-section li');
-  cityElements.forEach((element) => {
-    if (element.innerText === selectedCity) {
-      element.classList.add('selected');
-    } else {
-      element.classList.remove('selected');
+    // Add a class to the selected city for styling
+    const cityElements = document.querySelectorAll('.city-saving-section li');
+    cityElements.forEach((element) => {
+      if (element.innerText === selectedCity) {
+        element.classList.add('selected');
+      } else {
+        element.classList.remove('selected');
+      }
+    });
+
+     fetchWeatherData();
+    // The temperature display will be automatically updated by the reactive statement
+  }
+
+  function updateTemperatureDisplay() {
+    if (weatherData) {
+      // Update the current weather temperature in the UI
+      const currentTempElement = document.querySelector('.city-name h2');
+      currentTempElement.innerText = `${weatherData.city.name} (${getTemperature(
+        weatherData.list[0].temperature
+      )}${temperatureUnit === 'C' ? '°C' : '°F'})`;
+
+      // Update the forecast temperature values in the UI
+      const forecastItems = document.querySelectorAll('.forecast-item');
+      forecastItems.forEach((item, index) => {
+        const forecast = weatherData.list[index];
+        const tempElement = item.querySelector('p:nth-child(3)');
+        tempElement.innerText = `Temperature: ${getTemperature(
+          forecast.temperature
+        )}${temperatureUnit === 'C' ? '°C' : '°F'}`;
+      });
+
+      // Update the saved cities temperature values in the UI
+      const savedCityItems = document.querySelectorAll('.city-saving-section li');
+      savedCityItems.forEach((item) => {
+        const cityName = item.querySelector('.city-name').textContent.split(' - ')[0];
+        const cityData = savedCities.find((city) => city.name === cityName);
+        if (cityData) {
+          const tempElement = item.querySelector('span');
+          tempElement.innerText = `${cityData.name} - ${getTemperature(cityData.temperature)}${
+            temperatureUnit === 'C' ? '°C' : '°F'
+          }`;
+        }
+      });
     }
-  });
-
-  await fetchWeatherData();
-}
-
+  }
 
 async function fetchWeatherData() {
     isLoading = true;
