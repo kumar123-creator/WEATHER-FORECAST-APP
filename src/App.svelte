@@ -5,6 +5,8 @@
 	let isLoading = false;
 	let temperatureUnit = 'C';
 	let savedCities = [];
+
+	loadCitiesFromLocalStorage();
 	
 	$: {
     console.log('Temperature Unit Changed:', temperatureUnit);
@@ -60,6 +62,7 @@
       });
     }
   }
+  
 
 async function fetchWeatherData() {
     isLoading = true;
@@ -95,6 +98,7 @@ async function fetchWeatherData() {
 
       // Clear the input placeholder after successful fetch
       city = '';
+	  saveCitiesToLocalStorage();
     } catch (error) {
       errorMessage = 'Failed to fetch weather data. Please try again later.';
       weatherData = null;
@@ -141,10 +145,24 @@ async function fetchWeatherData() {
 		return temperature;
 	  }
 	}
-  
-	function removeCity(savedCityName) {
-    savedCities = savedCities.filter((cityData) => cityData.name !== savedCityName);
+	
+	function saveCitiesToLocalStorage() {
+  localStorage.setItem('savedCities', JSON.stringify(savedCities));
+}
+
+function loadCitiesFromLocalStorage() {
+  const savedCitiesData = localStorage.getItem('savedCities');
+  if (savedCitiesData) {
+    savedCities = JSON.parse(savedCitiesData);
   }
+}
+
+  
+function removeCity(savedCityName) {
+  savedCities = savedCities.filter((cityData) => cityData.name !== savedCityName);
+  saveCitiesToLocalStorage(); // Save the updated list after removing the city
+}
+
 
   </script>
   
